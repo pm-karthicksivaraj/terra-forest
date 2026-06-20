@@ -1,10 +1,12 @@
 // Temporary diagnostic route — DELETE AFTER DEBUGGING
 // Visit: https://terra-forest.vercel.app/api/debug-db
 //
-// Runs THREE tests in order:
-//   1. DNS resolution of the Neon hostname
-//   2. Raw TCP connection to host:5432 (bypasses Prisma/TLS)
-//   3. Prisma connection test (real DB query)
+// Runs sequential tests to isolate the Vercel→Neon connection failure:
+//   1. DNS resolution
+//   2. Raw TCP connection (bypasses Prisma/TLS)
+//   3. Prisma connection with the CURRENT DATABASE_URL (as configured)
+//   4. Prisma connection with channel_binding STRIPPED from URL
+//   5. Prisma connection with a clean minimal URL
 //
 // All values are masked — safe to share output.
 
@@ -57,7 +59,7 @@ async function testTcp(hostname: string, port: number) {
   const start = Date.now();
   return new Promise((resolve) => {
     const socket = new net.Socket();
-    const timeout = 10000; // 10s
+    const timeout = 10000;
 
     socket.setTimeout(timeout);
 
@@ -93,13 +95,47 @@ async function testTcp(hostname: string, port: number) {
   });
 }
 
+async function tryPrismaWithUrl(url: string, label: string) {
+  let prisma: PrismaClient | null = null;
+  try {
+    // Override env var for this PrismaClient instance
+    process.env.DATABASE_URL = url;
+    prisma = new PrismaClient({ log: ['error', 'warn'] });
+    const start = Date.now();
+    const result = await prisma.$queryRaw`SELECT 1 AS ok, current_database() AS db_name`;
+    const elapsed = Date.now() - start;
+    return {
+      label,
+      url_masked: maskUrl(url),
+      status: 'ok',
+      elapsed_ms: elapsed,
+      result,
+    };
+  } catch (err: unknown) {
+    return {
+      label,
+      url_masked: maskUrl(url),
+      status: 'failed',
+      error_name: err instanceof Error ? err.constructor.name : typeof err,
+      error_message: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    if (prisma) {
+      try { await prisma.$disconnect(); } catch {}
+    }
+  }
+}
+
 export async function GET() {
-  const raw = process.env.DATABASE_URL ?? '';
+  const rawOriginal = process.env.DATABASE_URL ?? '';
   const direct = process.env.DIRECT_URL ?? '';
   const nodeEnv = process.env.NODE_ENV ?? '(unset)';
   const vercelEnv = process.env.VERCEL_ENV ?? '(not on vercel)';
   const vercelRegion = process.env.VERCEL_REGION ?? '(unknown)';
-  const hostname = extractHost(raw);
+  const hostname = extractHost(rawOriginal);
+
+  // Save original to restore later
+  const savedUrl = rawOriginal;
 
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
@@ -109,16 +145,16 @@ export async function GET() {
       VERCEL_REGION: vercelRegion,
     },
     database_url: {
-      is_set: !!raw,
-      length: raw.length,
+      is_set: !!rawOriginal,
+      length: rawOriginal.length,
       starts_with_postgres_protocol:
-        raw.startsWith('postgresql://') || raw.startsWith('postgres://'),
-      has_pgbouncer: raw.includes('pgbouncer=true'),
-      has_sslmode_require: raw.includes('sslmode=require'),
-      has_channel_binding: raw.includes('channel_binding=require'),
-      has_trailing_whitespace: raw !== raw.trim(),
-      has_trailing_newline: raw.endsWith('\n') || raw.endsWith('\r'),
-      masked_value: maskUrl(raw),
+        rawOriginal.startsWith('postgresql://') || rawOriginal.startsWith('postgres://'),
+      has_pgbouncer: rawOriginal.includes('pgbouncer=true'),
+      has_sslmode_require: rawOriginal.includes('sslmode=require'),
+      has_channel_binding: rawOriginal.includes('channel_binding=require'),
+      has_trailing_whitespace: rawOriginal !== rawOriginal.trim(),
+      has_trailing_newline: rawOriginal.endsWith('\n') || rawOriginal.endsWith('\r'),
+      masked_value: maskUrl(rawOriginal),
       extracted_hostname: hostname,
     },
     direct_url: {
@@ -135,43 +171,42 @@ export async function GET() {
   }
   diagnostics.dns_test = dnsTest;
 
-  // ─── Test 2: Raw TCP connection (no Prisma, no TLS) ────────────────────
+  // ─── Test 2: Raw TCP connection ────────────────────────────────────────
   let tcpTest: unknown = { status: 'skipped', reason: 'no hostname extracted' };
   if (hostname) {
     tcpTest = await testTcp(hostname, 5432);
   }
   diagnostics.tcp_test = tcpTest;
 
-  // ─── Test 3: Full Prisma connection ────────────────────────────────────
-  let connectionTest: Record<string, unknown>;
-  let prisma: PrismaClient | null = null;
-  try {
-    if (!raw) {
-      connectionTest = { status: 'skipped', reason: 'DATABASE_URL not set' };
-    } else {
-      prisma = new PrismaClient({ log: ['error', 'warn'] });
-      const start = Date.now();
-      const result = await prisma.$queryRaw`SELECT 1 AS ok, NOW() AS server_time, current_database() AS db_name`;
-      const elapsed = Date.now() - start;
-      connectionTest = {
-        status: 'ok',
-        elapsed_ms: elapsed,
-        result: result,
-      };
-    }
-  } catch (err: unknown) {
-    connectionTest = {
-      status: 'failed',
-      error_name: err instanceof Error ? err.constructor.name : typeof err,
-      error_message: err instanceof Error ? err.message : String(err),
-      error_stack: err instanceof Error ? err.stack?.split('\n').slice(0, 5).join('\n') : null,
-    };
-  } finally {
-    if (prisma) {
-      try { await prisma.$disconnect(); } catch {}
-    }
+  // ─── Tests 3-5: Try Prisma with different URL variants ────────────────
+  const prismaTests: unknown[] = [];
+
+  // Test 3: As-configured (with channel_binding if present)
+  if (rawOriginal) {
+    prismaTests.push(await tryPrismaWithUrl(rawOriginal, 'as-configured'));
   }
-  diagnostics.prisma_connection_test = connectionTest;
+
+  // Test 4: Strip channel_binding from URL
+  if (rawOriginal && rawOriginal.includes('channel_binding=require')) {
+    const stripped = rawOriginal
+      .replace(/&channel_binding=require/g, '')
+      .replace(/channel_binding=require&?/g, '');
+    prismaTests.push(await tryPrismaWithUrl(stripped, 'without-channel_binding'));
+  }
+
+  // Test 5: Minimal URL — only sslmode=require
+  if (rawOriginal) {
+    try {
+      const u = new URL(rawOriginal);
+      const minimal = `postgresql://${u.username}:${u.password}@${u.hostname}${u.pathname}?sslmode=require`;
+      prismaTests.push(await tryPrismaWithUrl(minimal, 'minimal-sslmode-only'));
+    } catch {}
+  }
+
+  diagnostics.prisma_tests = prismaTests;
+
+  // Restore original env var
+  process.env.DATABASE_URL = savedUrl;
 
   return NextResponse.json(diagnostics, { status: 200 });
 }
