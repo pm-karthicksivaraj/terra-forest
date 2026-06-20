@@ -1,0 +1,110 @@
+# =============================================================================
+# Terra Forest — Root .gitignore (Next.js + Prisma + Flutter monorepo)
+# =============================================================================
+
+# ---- Secrets / Env ----
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# ---- Prisma ----
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations/dev/
+
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+# ---- Lock files (keep only one — package-lock.json) ----
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
+# =============================================================================
+# Flutter (terra-forest-mobile/)
+# =============================================================================
+
+# Flutter build / tooling
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+
+# Generated Flutter files
+**/.fvm/
+**/generated_plugin_registrant.dart
+
+# IDE
+**/*.iml
+**/.idea/
+**/.vscode/
+
+# Android specific
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/google-services.json
+**/android/app/release/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/.cxx/
+**/android/captures/
+**/*.keystore
+**/*.jks
+
+# iOS specific
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Generated.xcconfig
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/GoogleService-Info.plist
+**/*.xcuserstate
+**/ios/Runner.xcworkspace/xcuserdata/
+
+# macOS / Windows / Linux desktop
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+**/windows/flutter/ephemeral/
+**/linux/flutter/ephemeral/
+
+# Misc
+**/.DS_Store
+**/coverage/
+**/doc/api/

@@ -1,0 +1,931 @@
+// Terra Forest - Digital MRV Platform
+// PostgreSQL for production — SQLite option available for lightweight pilot
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// PROVINCES & ORGANIZATIONS
+// =============================================
+
+model Province {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name_vi      String
+  name_en      String
+  region       String
+  total_area_ha Float   @default(0)
+  total_plots  Int      @default(0)
+  center_lat   Float    @default(0)
+  center_lng   Float    @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  forest_plots  ForestPlot[]
+  organizations Organization[]
+  users         User[]
+  ranger_teams  RangerTeam[]
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  name_vi     String?
+  type        String
+  province_id String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  province Province? @relation(fields: [province_id], references: [id])
+  users    User[]
+}
+
+// =============================================
+// USERS & RBAC
+// =============================================
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  password        String
+  organization_id String?
+  province_id     String?
+  mfa_enabled     Boolean   @default(false)
+  mfa_secret      String?
+  avatar_url      String?
+  is_active       Boolean   @default(true)
+  last_login_at   DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  organization        Organization?      @relation(fields: [organization_id], references: [id])
+  province            Province?          @relation(fields: [province_id], references: [id])
+  carbon_verified     CarbonRecord[]     @relation("CarbonVerifier")
+  ai_reviewed         PlotAiAssessment[] @relation("AiReviewer")
+  report_generated    Report[]           @relation("ReportGenerator")
+  alerts_acknowledged Alert[]            @relation("AlertAcknowledger")
+  patrols_led         Patrol[]           @relation("PatrolLeader")
+  patrol_memberships  PatrolMember[]
+
+  // Ranger Device & Tracking relations
+  devices            Device[]
+  daily_activities   DailyActivity[]
+  team_memberships   RangerTeamMember[]
+  assigned_tasks     RangerTask[]       @relation("TaskAssignee")
+  created_tasks      RangerTask[]       @relation("TaskCreator")
+  verified_tasks     RangerTask[]       @relation("TaskVerifier")
+  uploaded_proofs    TaskProof[]        @relation("ProofUploader")
+  led_teams          RangerTeam[]       @relation("TeamLeader")
+
+  roles       UserRole[]
+  permissions UserPermission[]
+}
+
+model Role {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  guard_name String   @default("web")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  guard_name String   @default("web")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  roles RolePermission[]
+  users UserPermission[]
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  user_id String
+  role_id String
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role_id])
+}
+
+model UserPermission {
+  id            String @id @default(cuid())
+  user_id       String
+  permission_id String
+
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, permission_id])
+}
+
+model RolePermission {
+  id            String @id @default(cuid())
+  role_id       String
+  permission_id String
+
+  role       Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, permission_id])
+}
+
+// =============================================
+// FOREST PLOTS & SPATIAL DATA
+// =============================================
+
+model ForestPlot {
+  id               String   @id @default(cuid())
+  plot_code        String   @unique
+  province_id      String
+  area_ha          Float
+  forest_type      String
+  status           String   @default("active")
+  geometry_json    String?
+  centroid_lat     Float?
+  centroid_lng     Float?
+  fire_risk        String   @default("low")
+  tree_count       Int?
+  dominant_species String?
+  created_by       String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  province       Province          @relation(fields: [province_id], references: [id])
+  metadata       PlotMetadata?
+  carbon_records CarbonRecord[]
+  alerts         Alert[]
+  attachments    PlotAttachment[]
+  ai_assessments PlotAiAssessment[]
+  timber_passports TimberPassport[]
+  ndvi_readings  NdviReading[]
+  biodiversity_records BiodiversityRecord[]
+  ranger_tasks   RangerTask[]
+}
+
+model PlotMetadata {
+  id                   String   @id @default(cuid())
+  plot_id              String   @unique
+  title                String?
+  abstract             String?
+  purpose              String?
+  lineage              String?
+  contact_organization String?
+  crs                  String   @default("EPSG:3408")
+  citation             String?
+  reference_system     String?
+  data_quality         String?
+  source_imagery       String?
+  update_frequency     String?
+  completeness_pct     Float    @default(0)
+  geonetwork_url       String?
+  geonetwork_published Boolean  @default(false)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  plot ForestPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+}
+
+model PlotAttachment {
+  id          String   @id @default(cuid())
+  plot_id     String
+  filename    String
+  file_path   String
+  file_size   Int
+  mime_type   String
+  uploaded_by String?
+  created_at  DateTime @default(now())
+
+  plot ForestPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// CARBON RECORDS
+// =============================================
+
+model CarbonRecord {
+  id           String    @id @default(cuid())
+  plot_id      String
+  year         Int
+  carbon_stock Float
+  method       String
+  confidence   Float     @default(0)
+  status       String    @default("pending")
+  verified_by  String?
+  verified_at  DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  plot           ForestPlot @relation(fields: [plot_id], references: [id])
+  verified_user  User?      @relation("CarbonVerifier", fields: [verified_by], references: [id])
+}
+
+model CarbonCredit {
+  id               String   @id @default(cuid())
+  carbon_record_id String
+  co2e_tonnes      Float
+  vintage_year     Int
+  tx_hash          String?
+  credit_code      String?  @unique
+  status           String   @default("minted")
+  minted_at        DateTime @default(now())
+  verified_at      DateTime?
+  retired_at       DateTime?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+// =============================================
+// ALERTS
+// =============================================
+
+model Alert {
+  id              String    @id @default(cuid())
+  plot_id         String?
+  alert_type      String
+  severity        String
+  status          String    @default("active")
+  message         String?
+  message_vi      String?
+  detected_at     DateTime  @default(now())
+  acknowledged_by String?
+  acknowledged_at DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  plot              ForestPlot? @relation(fields: [plot_id], references: [id])
+  acknowledged_user User?       @relation("AlertAcknowledger", fields: [acknowledged_by], references: [id])
+}
+
+// =============================================
+// AI ASSESSMENTS
+// =============================================
+
+model PlotAiAssessment {
+  id              String   @id @default(cuid())
+  plot_id         String
+  assessment_type String
+  ai_result       String
+  confidence      Float    @default(0)
+  model_name      String
+  model_version   String
+  status          String   @default("needs_human_review")
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  assessed_at     DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  plot           ForestPlot @relation(fields: [plot_id], references: [id])
+  reviewed_user  User?      @relation("AiReviewer", fields: [reviewed_by], references: [id])
+}
+
+model SpeciesCorrection {
+  id                String   @id @default(cuid())
+  plot_id           String
+  original_species  String
+  corrected_species String
+  confidence        Float
+  corrected_by      String?
+  created_at        DateTime @default(now())
+}
+
+model PipelineRun {
+  id             String    @id @default(cuid())
+  plot_id        String
+  steps          String
+  status         String    @default("queued")
+  started_at     DateTime?
+  completed_at   DateTime?
+  error_message  String?
+  result_summary String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+}
+
+// =============================================
+// REPORTS
+// =============================================
+
+model Report {
+  id           String    @id @default(cuid())
+  report_type  String
+  plot_id      String?
+  status       String    @default("queued")
+  file_path    String?
+  file_size    Int?
+  generated_by String?
+  date_from    DateTime?
+  date_to      DateTime?
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  generated_user User? @relation("ReportGenerator", fields: [generated_by], references: [id])
+}
+
+// =============================================
+// MONITORING & WEATHER
+// =============================================
+
+model MonitoringStation {
+  id             String    @id @default(cuid())
+  name           String
+  name_vi        String?
+  station_code   String    @unique
+  province_id    String?
+  latitude       Float
+  longitude      Float
+  elevation_m    Float?
+  station_type   String
+  status         String    @default("active")
+  last_heartbeat DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  weather_readings WeatherReading[]
+}
+
+model WeatherReading {
+  id             String   @id @default(cuid())
+  station_id     String
+  temperature_c  Float
+  humidity_pct   Float
+  wind_speed_kph Float
+  rainfall_mm    Float
+  fwi_index      Float?
+  recorded_at    DateTime @default(now())
+  created_at     DateTime @default(now())
+
+  station MonitoringStation @relation(fields: [station_id], references: [id])
+}
+
+// =============================================
+// TIMBER TRACEABILITY
+// =============================================
+
+model TimberPassport {
+  id               String   @id @default(cuid())
+  plot_id          String
+  species          String
+  volume_m3        Float
+  vpa_flegt_status String   @default("pending")
+  passport_hash    String?
+  qr_code_url      String?
+  pdf_path         String?
+  issued_at        DateTime @default(now())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  plot       ForestPlot       @relation(fields: [plot_id], references: [id])
+  shipments  TimberShipment[]
+}
+
+model TimberShipment {
+  id            String   @id @default(cuid())
+  passport_id   String
+  origin_code   String
+  destination   String
+  transport_mode String  @default("truck")
+  status        String   @default("in_transit")
+  shipped_at    DateTime @default(now())
+  delivered_at  DateTime?
+  created_at    DateTime @default(now())
+
+  passport TimberPassport @relation(fields: [passport_id], references: [id])
+}
+
+// =============================================
+// FRMS SYNC LOG
+// =============================================
+
+model FrmsSyncLog {
+  id             String    @id @default(cuid())
+  sync_type      String
+  records_synced Int       @default(0)
+  status         String    @default("pending")
+  error_message  String?
+  started_at     DateTime  @default(now())
+  completed_at   DateTime?
+  duration_secs  Int?
+  created_at     DateTime  @default(now())
+}
+
+// =============================================
+// PATROLS & FIELD OBSERVATIONS
+// =============================================
+
+model Patrol {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  leader_id   String
+  plot_id     String?
+  start_time  DateTime
+  end_time    DateTime?
+  status      String    @default("planned")
+  route_geojson String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  leader      User            @relation("PatrolLeader", fields: [leader_id], references: [id])
+  members     PatrolMember[]
+  observations FieldObservation[]
+  task_links  RangerTask[]
+}
+
+model PatrolMember {
+  id        String   @id @default(cuid())
+  patrol_id String
+  user_id   String
+  role      String   @default("member")
+  joined_at DateTime @default(now())
+
+  patrol Patrol @relation(fields: [patrol_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id])
+}
+
+model FieldObservation {
+  id          String   @id @default(cuid())
+  patrol_id   String
+  obs_type    String
+  description String?
+  photo_url   String?
+  latitude    Float?
+  longitude   Float?
+  recorded_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  patrol Patrol @relation(fields: [patrol_id], references: [id], onDelete: Cascade)
+}
+
+// =============================================
+// NDVI READINGS
+// =============================================
+
+model NdviReading {
+  id         String   @id @default(cuid())
+  plot_id    String
+  month      Int
+  year       Int
+  ndvi_avg   Float
+  ndvi_min   Float?
+  ndvi_max   Float?
+  source     String   @default("sentinel2")
+  created_at DateTime @default(now())
+
+  plot ForestPlot @relation(fields: [plot_id], references: [id])
+}
+
+// =============================================
+// BIODIVERSITY RECORDS
+// =============================================
+
+model BiodiversityRecord {
+  id              String   @id @default(cuid())
+  plot_id         String
+  category        String
+  species_name    String
+  species_name_vi String?
+  common_name     String?
+  count           Int      @default(0)
+  conservation_status String?
+  notes           String?
+  recorded_date   DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  plot ForestPlot @relation(fields: [plot_id], references: [id])
+}
+
+// =============================================
+// AUDIT LOG
+// =============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  user_id    String?
+  action     String
+  entity     String
+  entity_id  String?
+  details    String?
+  ip_address String?
+  created_at DateTime @default(now())
+}
+
+// =============================================
+// RANGER DEVICE MANAGEMENT
+// =============================================
+
+model Device {
+  id            String    @id @default(cuid())
+  device_uuid   String    @unique
+  device_name   String?
+  platform      String
+  os_version    String?
+  app_version   String?
+  fcm_token     String?
+  user_id       String?
+  status        String    @default("active")
+  last_active_at DateTime?
+  registered_at DateTime  @default(now())
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  user              User?             @relation(fields: [user_id], references: [id])
+  device_locations  DeviceLocation[]
+  ota_updates       OtaInstallation[]
+  daily_activities  DailyActivity[]
+}
+
+model DeviceLocation {
+  id           String   @id @default(cuid())
+  device_id    String
+  latitude     Float
+  longitude    Float
+  accuracy_m   Float?
+  altitude_m   Float?
+  speed_kph    Float?
+  bearing      Float?
+  battery_pct  Int?
+  recorded_at  DateTime @default(now())
+
+  device Device @relation(fields: [device_id], references: [id])
+}
+
+model DailyActivity {
+  id                 String   @id @default(cuid())
+  device_id          String
+  user_id            String
+  date               DateTime
+  distance_km        Float    @default(0)
+  duration_minutes   Int      @default(0)
+  observations_count Int      @default(0)
+  photos_count       Int      @default(0)
+  tasks_completed    Int      @default(0)
+  tasks_assigned     Int      @default(0)
+  route_geojson      String?
+  created_at         DateTime @default(now())
+
+  device Device @relation(fields: [device_id], references: [id])
+  user   User   @relation(fields: [user_id], references: [id])
+}
+
+// =============================================
+// SCOUTING TEAMS
+// =============================================
+
+model RangerTeam {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  description String?
+  province_id String?
+  status      String    @default("active")
+  leader_id   String
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  province Province?         @relation(fields: [province_id], references: [id])
+  leader   User              @relation("TeamLeader", fields: [leader_id], references: [id])
+  members  RangerTeamMember[]
+  tasks    RangerTask[]
+}
+
+model RangerTeamMember {
+  id        String    @id @default(cuid())
+  team_id   String
+  user_id   String
+  role      String    @default("member")
+  joined_at DateTime  @default(now())
+  left_at   DateTime?
+
+  team RangerTeam @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [user_id], references: [id])
+}
+
+// =============================================
+// RANGER TASKS
+// =============================================
+
+model RangerTask {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  team_id          String?
+  assigned_to      String?
+  plot_id          String?
+  task_type        String
+  priority         String    @default("medium")
+  status           String    @default("assigned")
+  due_date         DateTime?
+  started_at       DateTime?
+  completed_at     DateTime?
+  verified_by      String?
+  verified_at      DateTime?
+  location_lat     Float?
+  location_lng     Float?
+  location_geojson String?
+  patrol_id        String?
+  created_by       String
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  team        RangerTeam?  @relation(fields: [team_id], references: [id])
+  assignee    User?        @relation("TaskAssignee", fields: [assigned_to], references: [id])
+  plot        ForestPlot?  @relation(fields: [plot_id], references: [id])
+  verifier    User?        @relation("TaskVerifier", fields: [verified_by], references: [id])
+  creator     User         @relation("TaskCreator", fields: [created_by], references: [id])
+  proofs      TaskProof[]
+  patrol_link Patrol?      @relation(fields: [patrol_id], references: [id])
+}
+
+// =============================================
+// TASK PROOFS (Evidence)
+// =============================================
+
+model TaskProof {
+  id            String   @id @default(cuid())
+  task_id       String
+  uploaded_by   String
+  proof_type    String
+  file_path     String
+  file_url      String?
+  file_size     Int?
+  mime_type     String?
+  thumbnail_url String?
+  duration_secs Int?
+  latitude      Float?
+  longitude     Float?
+  description   String?
+  metadata_json String?
+  recorded_at   DateTime @default(now())
+  created_at    DateTime @default(now())
+
+  task      RangerTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  uploader  User       @relation("ProofUploader", fields: [uploaded_by], references: [id])
+}
+
+// =============================================
+// OTA UPDATES (Over-the-air)
+// =============================================
+
+model OtaUpdate {
+  id            String    @id @default(cuid())
+  version       String
+  platform      String
+  release_notes String?
+  download_url  String
+  file_size     Int?
+  checksum      String?
+  is_mandatory  Boolean   @default(false)
+  status        String    @default("draft")
+  rollout_pct   Int       @default(100)
+  released_at   DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  installations OtaInstallation[]
+}
+
+model OtaInstallation {
+  id             String    @id @default(cuid())
+  ota_update_id  String
+  device_id      String
+  status         String    @default("pending")
+  started_at     DateTime?
+  completed_at   DateTime?
+  error_message  String?
+  created_at     DateTime  @default(now())
+
+  ota_update OtaUpdate @relation(fields: [ota_update_id], references: [id])
+  device     Device    @relation(fields: [device_id], references: [id])
+}
+
+// =============================================
+// NFMS & REDD+ / dMRV MODELS
+// =============================================
+
+model Jurisdiction {
+  id          String   @id @default(cuid())
+  name        String
+  level       String   // national, provincial, district, commune, forest_block
+  code        String   @unique
+  parent_id   String?
+  center_lat  Float    @default(0)
+  center_lng  Float    @default(0)
+  area_ha     Float    @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent   Jurisdiction?  @relation("JurisdictionTree", fields: [parent_id], references: [id])
+  children Jurisdiction[] @relation("JurisdictionTree")
+}
+
+model ForestClass {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  ipcc_class  String?
+  color       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model ReferenceMap {
+  id            String   @id @default(cuid())
+  version       String
+  description   String?
+  source        String
+  year          Int
+  status        String   @default("draft") // draft, published, archived
+  published_at  DateTime?
+  published_by  String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
+model LandCoverChange {
+  id               String   @id @default(cuid())
+  plot_id          String?
+  change_type      String   // deforestation, degradation, regeneration, afforestation
+  from_class       String?
+  to_class         String?
+  area_ha          Float
+  detected_date    DateTime
+  confidence       Float    @default(0)
+  source           String   @default("sentinel2")
+  source_imagery   String?
+  review_status    String   @default("pending") // pending, confirmed, rejected
+  reviewed_by      String?
+  reviewed_at      DateTime?
+  province         String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+model NfiPlot {
+  id              String   @id @default(cuid())
+  plot_code       String   @unique
+  province        String
+  forest_type     String
+  area_ha         Float
+  latitude        Float
+  longitude       Float
+  last_measured   DateTime?
+  dbh_mean_cm     Float?
+  height_mean_m   Float?
+  biomass_tc_ha   Float?
+  carbon_tc_ha    Float?
+  status          String   @default("active") // active, measured, pending
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  measurements NfiMeasurement[]
+}
+
+model NfiMeasurement {
+  id            String   @id @default(cuid())
+  nfi_plot_id   String
+  measured_date DateTime
+  species       String
+  dbh_cm        Float
+  height_m      Float
+  volume_m3     Float?
+  biomass_kg    Float?
+  observer      String?
+  method        String?
+  qa_status     String   @default("pending") // pending, passed, failed
+  created_at    DateTime @default(now())
+
+  nfi_plot NfiPlot @relation(fields: [nfi_plot_id], references: [id], onDelete: Cascade)
+}
+
+model EmissionFactor {
+  id             String   @id @default(cuid())
+  forest_type    String
+  pool           String   // above_ground, below_ground, deadwood, litter, soil
+  factor_value   Float
+  unit           String
+  tier           String   @default("tier1") // tier1, tier2, tier3
+  source         String?
+  region         String?
+  uncertainty    Float?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}
+
+model FrelRecord {
+  id              String    @id @default(cuid())
+  version         String
+  reference_start Int
+  reference_end   Int
+  average_emissions Float
+  unit            String    @default("tCO2e/year")
+  methodology     String?
+  forest_classes  String?
+  drivers         String?
+  assumptions     String?
+  status          String    @default("draft") // draft, submitted, approved
+  submitted_at    DateTime?
+  approved_at     DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+}
+
+model GhgEntry {
+  id              String   @id @default(cuid())
+  year            Int
+  stratum         String
+  activity_data   Float
+  emission_factor Float
+  emission_tco2e  Float
+  removal_tco2e   Float?
+  tier            String   @default("tier1")
+  source          String?
+  uncertainty_pct Float?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+}
+
+model ReddResult {
+  id                String   @id @default(cuid())
+  year              Int
+  activity_type     String   // reduced_deforestation, reduced_degradation, conservation, smfm, carbon_enhancement
+  emission_reduction Float
+  unit              String   @default("tCO2e")
+  frel_version      String?
+  status            String   @default("calculated") // calculated, verified, reported
+  verified_at       DateTime?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+}
+
+model SafeguardRecord {
+  id          String   @id @default(cuid())
+  category    String
+  description String?
+  status      String   @default("in_progress") // not_started, in_progress, addressed, documented
+  evidence    String?
+  updated_by  String?
+  updated_at  DateTime @updatedAt
+  created_at  DateTime @default(now())
+}
+
+model VerificationCycle {
+  id              String    @id @default(cuid())
+  cycle_name      String
+  verifier        String
+  status          String    @default("planned") // planned, in_progress, completed, failed
+  start_date      DateTime?
+  end_date        DateTime?
+  findings        String?
+  recommendations String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+}
+
+model DataLineage {
+  id           String   @id @default(cuid())
+  entity_type  String
+  entity_id    String
+  source       String
+  method       String?
+  confidence   Float?
+  timestamp    DateTime @default(now())
+  details      String?
+  created_at   DateTime @default(now())
+}
+
+// =============================================
+// WORKFLOW HISTORY
+// =============================================
+
+model WorkflowHistory {
+  id              String   @id @default(cuid())
+  entity_type     String   // alert, fire_incident, patrol, task, carbon_record, timber_passport, biodiversity_record
+  entity_id       String
+  from_state      String
+  to_state        String
+  action          String   // acknowledge, dispatch, resolve, escalate, verify, approve, reject, etc.
+  performed_by    String
+  performed_role  String
+  comment         String?
+  created_at      DateTime @default(now())
+
+  @@index([entity_type, entity_id])
+  @@index([performed_by])
+}

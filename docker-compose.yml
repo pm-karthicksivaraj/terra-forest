@@ -1,0 +1,88 @@
+# ============================================================
+# Terra Forest - Local Development Stack
+# Redis + MinIO + Keycloak + GeoServer
+# (PostgreSQL runs natively on the host)
+# ============================================================
+
+services:
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    container_name: terra-forest-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- MinIO (S3-compatible storage) ----
+  minio:
+    image: minio/minio:latest
+    container_name: terra-forest-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Keycloak (SSO) ----
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: terra-forest-keycloak
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://host.docker.internal:5432/terra_forest
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: root@1234
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    command: ["start-dev"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ---- GeoServer ----
+  geoserver:
+    image: kartoza/geoserver:2.24.0
+    container_name: terra-forest-geoserver
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      GEOSERVER_ADMIN_PASSWORD: geoserver
+      STABLE_EXTENSIONS: wps,csw
+      POSTGRES_JNDI: true
+      POSTGRES_HOST: host.docker.internal
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: terra_forest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root@1234
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+
+volumes:
+  redis_data:
+  minio_data:
+  geoserver_data:

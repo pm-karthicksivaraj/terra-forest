@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Central tree trunk -->
+    <path
+        android:fillColor="#52B788"
+        android:pathData="M51,78 L57,78 L57,58 L51,58 Z" />
+
+    <!-- Tree canopy - main triangle (larger, bottom layer) -->
+    <path
+        android:fillColor="#52B788"
+        android:pathData="M54,22 L72,54 L36,54 Z" />
+
+    <!-- Tree canopy - middle triangle -->
+    <path
+        android:fillColor="#40916C"
+        android:pathData="M54,18 L68,46 L40,46 Z" />
+
+    <!-- Tree canopy - top triangle (smallest, highlights the peak) -->
+    <path
+        android:fillColor="#52B788"
+        android:pathData="M54,14 L64,38 L44,38 Z" />
+
+    <!-- Small ground mound under the tree -->
+    <path
+        android:fillColor="#2D6A4F"
+        android:pathData="M34,78 Q54,70 74,78 Z" />
+
+    <!-- Small left accent tree (background) -->
+    <path
+        android:fillColor="#2D6A4F"
+        android:pathData="M28,72 L34,56 L40,72 Z" />
+    <path
+        android:fillColor="#2D6A4F"
+        android:pathData="M30.5,72 L33.5,72 L33.5,76 L30.5,76 Z" />
+
+    <!-- Small right accent tree (background) -->
+    <path
+        android:fillColor="#2D6A4F"
+        android:pathData="M68,72 L74,58 L80,72 Z" />
+    <path
+        android:fillColor="#2D6A4F"
+        android:pathData="M71.5,72 L74.5,72 L74.5,76 L71.5,76 Z" />
+
+</vector>
