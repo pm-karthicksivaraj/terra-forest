@@ -7,11 +7,16 @@ class AppConstants {
 
   // ─── API Configuration ────────────────────────────────────────────────────
 
-  /// Base URL for API requests. Default targets Android emulator localhost.
-  static const String apiBaseUrl = 'http://10.0.2.2:3000';
+  /// Base URL for API requests.
+  /// Production: Terra Forest web app deployed on Vercel.
+  /// For local dev with the Next.js backend running on your machine:
+  ///   - Android emulator:  http://10.0.2.2:3000
+  ///   - iOS simulator:     http://localhost:3000
+  ///   - Physical device:   http://192.168.x.x:3000 (your LAN IP)
+  static const String apiBaseUrl = 'https://terra-forest.vercel.app';
 
-  /// iOS simulator localhost.
-  static const String apiBaseUrlIOS = 'http://localhost:3000';
+  /// iOS simulator localhost (kept for local-dev override).
+  static const String apiBaseUrlIOS = 'https://terra-forest.vercel.app';
 
   /// API version prefix.
   static const String apiVersionPrefix = '/api/v1';

@@ -86,7 +86,7 @@ class OtaRepositoryImpl implements OtaRepository {
           '- Cập nhật giao diện danh sách nhiệm vụ\n'
           '- Tối ưu hóa pin khi theo dõi GPS\n'
           '- Sửa lỗi crash khi chụp ảnh bằng chứng',
-      downloadUrl: 'https://api.terraforest.example.com/ota/v1.2.0.apk',
+      downloadUrl: 'https://terra-forest.vercel.app/ota/v1.2.0.apk',
       fileSize: 25 * 1024 * 1024,
       checksum: 'abc123def456',
       isMandatory: false,

@@ -122,7 +122,7 @@ class ApiClient {
   /// Public getter for the configured Dio instance (used by data sources)
   Dio get dio => _dio;
 
-  String _baseUrl = 'https://api.terraforest.example.com';
+  String _baseUrl = 'https://terra-forest.vercel.app';
   static const String _accessTokenKey = 'auth_access_token';
   static const String _refreshTokenKey = 'auth_refresh_token';
 

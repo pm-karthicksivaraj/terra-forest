@@ -149,14 +149,13 @@ dart run build_runner build --delete-conflicting-outputs
 Edit `lib/core/constants/app_constants.dart`:
 
 ```dart
-// Android emulator
-static const String apiBaseUrl = 'http://10.0.2.2:3000';
+// Production (default — points to the Vercel deployment)
+static const String apiBaseUrl = 'https://terra-forest.vercel.app';
 
-// Physical device (use your computer's IP)
-// static const String apiBaseUrl = 'http://192.168.1.100:3000';
-
-// Production
-// static const String apiBaseUrl = 'https://terra-forest.example.com';
+// Local dev with Next.js running on your machine:
+//   - Android emulator:  http://10.0.2.2:3000
+//   - iOS simulator:     http://localhost:3000
+//   - Physical device:   http://192.168.1.100:3000 (your LAN IP)
 ```
 
 ### 5. Run the App
