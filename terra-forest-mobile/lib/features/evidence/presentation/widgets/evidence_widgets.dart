@@ -396,7 +396,7 @@ class CaptureButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconCode = AppConstants.evidenceTypeIcons[type];
+    final icon = AppConstants.evidenceTypeIcons[type];
     final color = _typeColor(type);
 
     return InkWell(
@@ -411,7 +411,7 @@ class CaptureButton extends StatelessWidget {
           border: Border.all(color: color, width: 3),
         ),
         child: Icon(
-          iconCode != null ? IconData(iconCode, fontFamily: 'MaterialIcons') : Icons.camera_alt,
+          icon ?? Icons.camera_alt,
           color: color,
           size: 32,
         ),

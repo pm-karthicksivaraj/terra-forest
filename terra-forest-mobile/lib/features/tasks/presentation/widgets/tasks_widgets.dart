@@ -204,10 +204,10 @@ class TaskTypeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconCode = AppConstants.taskTypeIcons[type];
+    final icon = AppConstants.taskTypeIcons[type];
     final color = _typeColor(type);
     return Icon(
-      iconCode != null ? IconData(iconCode, fontFamily: 'MaterialIcons') : Icons.assignment,
+      icon ?? Icons.assignment,
       size: size,
       color: color,
     );

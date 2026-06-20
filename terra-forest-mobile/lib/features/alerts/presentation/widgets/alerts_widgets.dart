@@ -211,10 +211,10 @@ class AlertTypeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconCode = AppConstants.alertTypeIcons[type];
+    final icon = AppConstants.alertTypeIcons[type];
     final color = _typeColor(type);
     return Icon(
-      iconCode != null ? IconData(iconCode, fontFamily: 'MaterialIcons') : Icons.warning_amber,
+      icon ?? Icons.warning_amber,
       size: size,
       color: color,
     );

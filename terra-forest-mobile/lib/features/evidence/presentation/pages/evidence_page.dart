@@ -227,8 +227,7 @@ class EvidencePage extends StatelessWidget {
   }
 
   IconData _typeIcon(String type) {
-    final iconCode = AppConstants.evidenceTypeIcons[type];
-    return iconCode != null ? IconData(iconCode, fontFamily: 'MaterialIcons') : Icons.insert_drive_file;
+    return AppConstants.evidenceTypeIcons[type] ?? Icons.insert_drive_file;
   }
 
   Color _typeColor(String type) {

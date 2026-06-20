@@ -335,14 +335,19 @@ class AppConstants {
     taskEvidenceCollection: 'Thu thập bằng chứng',
   };
 
-  /// Task type icon mapping (Material Icons code points).
-  static const Map<String, int> taskTypeIcons = {
-    taskPatrol: 0xE565, // Icons.directions_walk
-    taskObservation: 0xE417, // Icons.visibility
-    taskFireCheck: 0xEF55, // Icons.local_fire_department
-    taskBoundarySurvey: 0xE55F, // Icons.edit_location_alt
-    taskSpeciesCount: 0xE6B8, // Icons.pets
-    taskEvidenceCollection: 0xE3AF, // Icons.camera_alt
+  /// Task type icon mapping (Material Icons).
+  ///
+  /// NOTE: We store `IconData` (via the const `Icons.*` references) rather than
+  /// raw int codepoints so Flutter's icon tree-shaker works in release builds.
+  /// Using `IconData(0x..., fontFamily: 'MaterialIcons')` with a runtime int
+  /// breaks `--release` builds with "Avoid non-constant invocations of IconData".
+  static const Map<String, IconData> taskTypeIcons = {
+    taskPatrol: Icons.directions_walk,
+    taskObservation: Icons.visibility,
+    taskFireCheck: Icons.local_fire_department,
+    taskBoundarySurvey: Icons.edit_location_alt,
+    taskSpeciesCount: Icons.pets,
+    taskEvidenceCollection: Icons.camera_alt,
   };
 
   // ─── Alert Types ──────────────────────────────────────────────────────────
@@ -371,13 +376,16 @@ class AppConstants {
     alertAiDetection: 'Phát hiện AI',
   };
 
-  /// Alert type icon mapping (Material Icons code points).
-  static const Map<String, int> alertTypeIcons = {
-    alertFireRisk: 0xEF55, // Icons.local_fire_department
-    alertDeforestation: 0xE8B2, // Icons.forest
-    alertForestChange: 0xE87D, // Icons.compare
-    alertDisease: 0xE8E5, // Icons.coronavirus
-    alertAiDetection: 0xE7A5, // Icons.psychology
+  /// Alert type icon mapping (Material Icons).
+  ///
+  /// See [taskTypeIcons] for why we use `IconData` constants instead of
+  /// raw int codepoints.
+  static const Map<String, IconData> alertTypeIcons = {
+    alertFireRisk: Icons.local_fire_department,
+    alertDeforestation: Icons.forest,
+    alertForestChange: Icons.compare,
+    alertDisease: Icons.coronavirus,
+    alertAiDetection: Icons.psychology,
   };
 
   // ─── Alert Severities ─────────────────────────────────────────────────────
@@ -453,13 +461,16 @@ class AppConstants {
     evidenceGpsTrack: 'Đường GPS',
   };
 
-  /// Evidence type icon mapping (Material Icons code points).
-  static const Map<String, int> evidenceTypeIcons = {
-    evidencePhoto: 0xE3AF,    // Icons.camera_alt
-    evidenceVideo: 0xE04B,    // Icons.videocam
-    evidenceVoiceNote: 0xE029, // Icons.mic
-    evidenceDocument: 0xE80D, // Icons.description
-    evidenceGpsTrack: 0xE56C, // Icons.route
+  /// Evidence type icon mapping (Material Icons).
+  ///
+  /// See [taskTypeIcons] for why we use `IconData` constants instead of
+  /// raw int codepoints.
+  static const Map<String, IconData> evidenceTypeIcons = {
+    evidencePhoto: Icons.camera_alt,
+    evidenceVideo: Icons.videocam,
+    evidenceVoiceNote: Icons.mic,
+    evidenceDocument: Icons.description,
+    evidenceGpsTrack: Icons.route,
   };
 
   /// Maximum file sizes per evidence type in megabytes.
