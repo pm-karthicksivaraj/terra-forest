@@ -2,7 +2,8 @@
 // PostgreSQL for production — SQLite option available for lightweight pilot
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
