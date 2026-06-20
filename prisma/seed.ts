@@ -295,6 +295,63 @@ async function main() {
     },
   });
 
+  // Extra demo accounts shown on the login page (admin/ops/lead/ranger/auditor).
+  // We map them to the closest existing roles so the login page demo list all works.
+  const opsUser = await prisma.user.upsert({
+    where: { email: 'ops@terraforest.vn' },
+    update: {},
+    create: {
+      name: 'Ops Manager',
+      email: 'ops@terraforest.vn',
+      password: hashedPassword,
+      organization_id: orgFpd.id,
+      province_id: dongnai.id,
+      mfa_enabled: false,
+      is_active: true,
+    },
+  });
+
+  const leadUser = await prisma.user.upsert({
+    where: { email: 'lead@terraforest.vn' },
+    update: {},
+    create: {
+      name: 'Team Lead',
+      email: 'lead@terraforest.vn',
+      password: hashedPassword,
+      organization_id: orgFpd.id,
+      province_id: dongnai.id,
+      mfa_enabled: false,
+      is_active: true,
+    },
+  });
+
+  const rangerUser = await prisma.user.upsert({
+    where: { email: 'ranger@terraforest.vn' },
+    update: {},
+    create: {
+      name: 'Forest Ranger',
+      email: 'ranger@terraforest.vn',
+      password: hashedPassword,
+      organization_id: orgFpd.id,
+      province_id: dongnai.id,
+      mfa_enabled: false,
+      is_active: true,
+    },
+  });
+
+  const auditorUser = await prisma.user.upsert({
+    where: { email: 'auditor@terraforest.vn' },
+    update: {},
+    create: {
+      name: 'Auditor',
+      email: 'auditor@terraforest.vn',
+      password: hashedPassword,
+      organization_id: orgVnfp.id,
+      mfa_enabled: false,
+      is_active: true,
+    },
+  });
+
   // Assign roles
   await prisma.userRole.upsert({
     where: { user_id_role_id: { user_id: adminUser.id, role_id: roleAdmin.id } },
@@ -317,7 +374,31 @@ async function main() {
     create: { user_id: fieldUser.id, role_id: roleFieldOfficer.id },
   });
 
-  console.log(`   Created 4 users with roles\n`);
+  // Assign roles for the login-page demo accounts.
+  // Map: ops → analyst (closest existing role), lead → field_officer,
+  //      ranger → field_officer, auditor → gov_viewer.
+  await prisma.userRole.upsert({
+    where: { user_id_role_id: { user_id: opsUser.id, role_id: roleAnalyst.id } },
+    update: {},
+    create: { user_id: opsUser.id, role_id: roleAnalyst.id },
+  });
+  await prisma.userRole.upsert({
+    where: { user_id_role_id: { user_id: leadUser.id, role_id: roleFieldOfficer.id } },
+    update: {},
+    create: { user_id: leadUser.id, role_id: roleFieldOfficer.id },
+  });
+  await prisma.userRole.upsert({
+    where: { user_id_role_id: { user_id: rangerUser.id, role_id: roleFieldOfficer.id } },
+    update: {},
+    create: { user_id: rangerUser.id, role_id: roleFieldOfficer.id },
+  });
+  await prisma.userRole.upsert({
+    where: { user_id_role_id: { user_id: auditorUser.id, role_id: roleGovViewer.id } },
+    update: {},
+    create: { user_id: auditorUser.id, role_id: roleGovViewer.id },
+  });
+
+  console.log(`   Created 8 users with roles\n`);
 
   // ---- 5. Forest Plots ----
   console.log('🌲 Creating forest plots...');
@@ -558,7 +639,7 @@ async function main() {
   console.log('   - 5 provinces');
   console.log('   - 5 organizations');
   console.log('   - 4 roles + 14 permissions');
-  console.log('   - 4 users (admin/analyst/gov_viewer/field_officer)');
+  console.log('   - 8 users (admin/analyst/gov_viewer/field_officer + ops/lead/ranger/auditor demo)');
   console.log('   - 10 forest plots');
   console.log('   - 50 carbon records (5 years x 10 plots)');
   console.log('   - 15 alerts');
@@ -566,11 +647,15 @@ async function main() {
   console.log('   - 8 reports');
   console.log('   - 4 monitoring stations');
   console.log('   - Carbon credits & plot metadata');
-  console.log('\n🔐 Login credentials:');
-  console.log('   admin@terraforest.vn / password');
-  console.log('   analyst@terraforest.vn / password');
-  console.log('   govviewer@terraforest.vn / password');
-  console.log('   fieldofficer@terraforest.vn / password');
+  console.log('\n🔐 Login credentials (password for all: password):');
+  console.log('   admin@terraforest.vn        (role: admin)');
+  console.log('   analyst@terraforest.vn      (role: analyst)');
+  console.log('   govviewer@terraforest.vn    (role: gov_viewer)');
+  console.log('   fieldofficer@terraforest.vn (role: field_officer)');
+  console.log('   ops@terraforest.vn          (role: analyst — login page demo)');
+  console.log('   lead@terraforest.vn         (role: field_officer — login page demo)');
+  console.log('   ranger@terraforest.vn       (role: field_officer — login page demo)');
+  console.log('   auditor@terraforest.vn      (role: gov_viewer — login page demo)');
 }
 
 main()
