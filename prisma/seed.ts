@@ -242,14 +242,14 @@ async function main() {
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@terraforest.vn' },
-    update: {},
+    update: { mfa_enabled: false },
     create: {
       name: 'Nguyễn Văn Admin',
       email: 'admin@terraforest.vn',
       password: hashedPassword,
       organization_id: orgFpd.id,
       province_id: dongnai.id,
-      mfa_enabled: true,
+      mfa_enabled: false,
       is_active: true,
     },
   });
@@ -270,13 +270,13 @@ async function main() {
 
   const govUser = await prisma.user.upsert({
     where: { email: 'govviewer@terraforest.vn' },
-    update: {},
+    update: { mfa_enabled: false },
     create: {
       name: 'Lê Minh GovViewer',
       email: 'govviewer@terraforest.vn',
       password: hashedPassword,
       organization_id: orgVnfp.id,
-      mfa_enabled: true,
+      mfa_enabled: false,
       is_active: true,
     },
   });
